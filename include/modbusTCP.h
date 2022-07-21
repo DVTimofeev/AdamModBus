@@ -1,7 +1,11 @@
 #pragma once
-
+// 3d party lib
 #include <boost/asio.hpp>
-#include <utility>
+
+// standard lib
+#include <optional>
+#include <sstream>
+// #include <utility>
 
 using boost::asio::ip::tcp;
 
@@ -70,7 +74,6 @@ namespace modbus
         
         // connection
         bool connect();
-        bool is_connected();
 
         // Setters
         void set_name(std::string new_name);
@@ -82,9 +85,9 @@ namespace modbus
         std::string get_ip_address() const;
         uint16_t get_port() const;
 
-        bool read_DO(uint8_t address);
-        bool read_DI(uint8_t address);
-        uint16_t read_AO(uint8_t address);
+        std::optional<uint8_t> read_DO(uint8_t address,  uint8_t reg_count = 1);
+        std::optional<uint8_t> read_DI(uint8_t address,  uint8_t reg_count = 1);
+        std::optional<uint16_t> read_AO(uint8_t address);
         size_t read_AI();
         size_t write_DO(uint8_t adress, uint8_t value);
         size_t write_AO(uint8_t adress, uint8_t value);
@@ -99,6 +102,9 @@ namespace modbus
         // boost::asio::ip::tcp
         tcp::endpoint ep_;
         tcp::socket sock_;
+
+        //connection
+        bool is_connected = false;
 
         std::array<uint8_t,17> send_;
         std::array<uint8_t,13> rcv_;
@@ -124,26 +130,30 @@ namespace modbus
         if (ep_.address().is_unspecified())
         {
             // No address is specified, connection cannot be completed
-            //loging
-            return false;
+            /**
+             * @todo add loging using boost::log
+             * 
+             */
+            is_connected = false;
+        }
+        else
+        {
+            try
+            {
+                sock_.connect(ep_);
+                is_connected = true;
+            }
+            catch (...)
+            {
+                /**
+                 * @todo add loging using boost::log
+                 * 
+                 */
+            }
         }
         
-        try
-        {
-            sock_.connect(ep_);
-        }
-        catch (...)
-        {
-            //loging
-        }
-        return true;
+        return is_connected;
     }
-
-    bool ModbusTCP::is_connected()
-    {
-        return sock_.is_open();
-    }
-
 
     /**
      * @brief set name
@@ -163,6 +173,9 @@ namespace modbus
     void ModbusTCP::set_ip_address(std::string ip) 
     {
         ip_address_ = std::move(ip);
+
+        // after changing ip address reconnection is required
+        is_connected = false;
     }
 
     /**
@@ -173,6 +186,9 @@ namespace modbus
     void ModbusTCP::set_port(uint16_t port) 
     {
         port_ = port;
+
+        // after changing port number reconnection is required
+        is_connected = false;
     }
 
     /**
@@ -206,28 +222,101 @@ namespace modbus
     }
 
     /**
-     * @brief read digital output at address
+     * @brief read digital output(s) at address
      * 
      * @param address       coil address
-     * @return true 
-     * @return false 
+     * @param reg_count     number of registers following the address
+     * @return std::optional<uint8_t>   each bit is responsible for coil condition 0/1 - OFF/ON
      */
-    bool read_DO(uint8_t address)
+    std::optional<uint8_t> ModbusTCP::read_DO(uint8_t address, uint8_t reg_count)
     {
-        return true;
+        std::optional<uint8_t> result;
+        try
+        {
+            init_bytes_to_send();
+            send_[7] = 1;
+            send_[9] = address;
+            send_[11] = reg_count;
+            auto response = sock_send(12);
+            if (response != 12)
+            {
+                /**
+                 * @todo add loging using boost::log
+                 * 
+                 */
+                std::stringstream err_msg;
+                err_msg << "Was sent: " << response << " bytes. Should be: 12";
+                throw std::exception(err_msg.str().c_str());
+            }
+            
+            response = sock_read();
+            if (response == 9)
+            {
+                /**
+                 * @todo add loging using boost::log
+                 * 
+                 */
+                std::stringstream err_msg;
+                err_msg << "ModBus read error: " << std::hex << rcv_[8];
+                throw std::exception(err_msg.str().c_str());
+            }
+        result = rcv_[9];
+        }
+        catch(const std::exception& e)
+        {
+            std::cerr << e.what() << '\n';
+            
+        }    
+        return result;
     }
 
     /**
      * @brief read digital input at address
      * 
      * @param address       coil address
-     * @return true    
-     * @return false 
+     * @param reg_count     number of registers following the address
+     * @return std::optional<uint8_t>   each bit is responsible for coil condition 0/1 - OFF/ON 
      */
-    bool read_DI(uint8_t address)
+    std::optional<uint8_t> ModbusTCP::read_DI(uint8_t address, uint8_t reg_count)
     {
-        return true;
-
+        std::optional<uint8_t> result;
+        try
+        {
+            init_bytes_to_send();
+            send_[7] = 2;
+            send_[9] = address;
+            send_[11] = reg_count;
+            auto response = sock_send(12);
+            if (response != 12)
+            {
+                /**
+                 * @todo add loging using boost::log
+                 * 
+                 */
+                std::stringstream err_msg;
+                err_msg << "Was sent: " << response << " bytes. Should be: 12";
+                throw std::exception(err_msg.str().c_str());
+            }
+            
+            response = sock_read();
+            if (response == 9)
+            {
+                /**
+                 * @todo add loging using boost::log
+                 * 
+                 */
+                std::stringstream err_msg;
+                err_msg << "ModBus read error: " << std::hex << rcv_[8];
+                throw std::exception(err_msg.str().c_str());
+            }
+        result = rcv_[9];
+        }
+        catch(const std::exception& e)
+        {
+            std::cerr << e.what() << '\n';
+            
+        }    
+        return result;
     }
 
     /**
@@ -236,29 +325,51 @@ namespace modbus
      * @param address       coil address  
      * @return uint16_t     Dec value
      */
-    uint16_t ModbusTCP::read_AO(uint8_t address) 
+    std::optional<uint16_t> ModbusTCP::read_AO(uint8_t address) 
     {
-        init_bytes_to_send();
-        send_[7] = 3;
-        send_[9] = address;
-        send_[11] = 1;
-        auto response = sock_send(12);
-        if (response != 12)
+        std::optional<uint16_t> result;
+        try
         {
-            //return fail
-        }
-        
-        response = sock_read();
-        if (response == 7)
-        {
-            return 6666;
-        }
+            init_bytes_to_send();
+            send_[7] = 3;
+            send_[9] = address;
+            send_[11] = 1;
+            auto response = sock_send(12);
+            if (response != 12)
+            {
+                /**
+                 * @todo add loging using boost::log
+                 * 
+                 */
+                std::stringstream err_msg;
+                err_msg << "Was sent: " << response << " bytes. Should be: 12";
+                throw std::exception(err_msg.str().c_str());
+            }
+            
+            response = sock_read();
+            if (response == 9)
+            {
+                /**
+                 * @todo add loging using boost::log
+                 * 
+                 */
+                std::stringstream err_msg;
+                err_msg << "ModBus read error: " << std::hex << rcv_[8];
+                throw std::exception(err_msg.str().c_str());
+            }
 
         // the result consists of two bytes 10th and 11th
-        uint16_t value = rcv_[9];
+        result = rcv_[9];
+
         // merging 2 bytes in uint16_t value and returning it as result
-        value = (value << 8) | rcv_[10];
-        return value;
+        result = (result.value() << 8) | rcv_[10];
+        }
+        catch(const std::exception& e)
+        {
+            std::cerr << e.what() << '\n';
+            
+        }    
+        return result;
     }
 
     /**
@@ -278,6 +389,11 @@ namespace modbus
      */
     uint8_t ModbusTCP::sock_send(uint8_t byte_count)
     {
+        if (!is_connected)
+        {
+            connect();
+        }
+
         try
         {
             return sock_.write_some(boost::asio::buffer(send_, byte_count));  
@@ -285,6 +401,7 @@ namespace modbus
         catch(const std::exception& e)
         {
             std::cerr << e.what() << '\n';
+            is_connected = false;
             return 0;
         }
         
@@ -297,6 +414,20 @@ namespace modbus
      */
     uint8_t ModbusTCP::sock_read()
     {
-        return sock_.read_some(boost::asio::buffer(rcv_));
+        if (!is_connected)
+        {
+            connect();
+        }
+
+        try
+        {
+            return sock_.read_some(boost::asio::buffer(rcv_));
+        }
+        catch(const std::exception& e)
+        {
+            std::cerr << e.what() << '\n';
+            is_connected = false;
+            return 9;
+        }
     }
 }
