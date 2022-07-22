@@ -95,8 +95,8 @@ namespace modbus
         size_t write_AOs(uint8_t adress, uint8_t count, uint8_t value);
     private:
         void init_bytes_to_send();
-        uint8_t sock_send(uint8_t bytes);
-        uint8_t sock_read();
+        void sock_send(uint8_t bytes);
+        void sock_read();
 
     private:
         // boost::asio::ip::tcp
@@ -237,35 +237,15 @@ namespace modbus
             send_[7] = 1;
             send_[9] = address;
             send_[11] = reg_count;
-            auto response = sock_send(12);
-            if (response != 12)
-            {
-                /**
-                 * @todo add loging using boost::log
-                 * 
-                 */
-                std::stringstream err_msg;
-                err_msg << "Was sent: " << response << " bytes. Should be: 12";
-                throw std::exception(err_msg.str().c_str());
-            }
+
+            sock_send(12);           
+            sock_read();
             
-            response = sock_read();
-            if (response == 9)
-            {
-                /**
-                 * @todo add loging using boost::log
-                 * 
-                 */
-                std::stringstream err_msg;
-                err_msg << "ModBus read error: " << std::hex << rcv_[8];
-                throw std::exception(err_msg.str().c_str());
-            }
-        result = rcv_[9];
+            result = rcv_[9];
         }
         catch(const std::exception& e)
         {
             std::cerr << e.what() << '\n';
-            
         }    
         return result;
     }
@@ -286,35 +266,15 @@ namespace modbus
             send_[7] = 2;
             send_[9] = address;
             send_[11] = reg_count;
-            auto response = sock_send(12);
-            if (response != 12)
-            {
-                /**
-                 * @todo add loging using boost::log
-                 * 
-                 */
-                std::stringstream err_msg;
-                err_msg << "Was sent: " << response << " bytes. Should be: 12";
-                throw std::exception(err_msg.str().c_str());
-            }
-            
-            response = sock_read();
-            if (response == 9)
-            {
-                /**
-                 * @todo add loging using boost::log
-                 * 
-                 */
-                std::stringstream err_msg;
-                err_msg << "ModBus read error: " << std::hex << rcv_[8];
-                throw std::exception(err_msg.str().c_str());
-            }
-        result = rcv_[9];
+
+            sock_send(12);
+            sock_read();
+
+            result = rcv_[9];
         }
         catch(const std::exception& e)
         {
             std::cerr << e.what() << '\n';
-            
         }    
         return result;
     }
@@ -334,40 +294,19 @@ namespace modbus
             send_[7] = 3;
             send_[9] = address;
             send_[11] = 1;
-            auto response = sock_send(12);
-            if (response != 12)
-            {
-                /**
-                 * @todo add loging using boost::log
-                 * 
-                 */
-                std::stringstream err_msg;
-                err_msg << "Was sent: " << response << " bytes. Should be: 12";
-                throw std::exception(err_msg.str().c_str());
-            }
             
-            response = sock_read();
-            if (response == 9)
-            {
-                /**
-                 * @todo add loging using boost::log
-                 * 
-                 */
-                std::stringstream err_msg;
-                err_msg << "ModBus read error: " << std::hex << rcv_[8];
-                throw std::exception(err_msg.str().c_str());
-            }
+            sock_send(12);
+            sock_read();
+            
+            // the result consists of two bytes 10th and 11th
+            result = rcv_[9];
 
-        // the result consists of two bytes 10th and 11th
-        result = rcv_[9];
-
-        // merging 2 bytes in uint16_t value and returning it as result
-        result = (result.value() << 8) | rcv_[10];
+            // merging 2 bytes in uint16_t value and returning it as result
+            result = (result.value() << 8) | rcv_[10];
         }
         catch(const std::exception& e)
         {
             std::cerr << e.what() << '\n';
-            
         }    
         return result;
     }
@@ -387,8 +326,10 @@ namespace modbus
      * @param byte_count    number of bytes to write
      * @return uint8_t      number of byte written
      */
-    uint8_t ModbusTCP::sock_send(uint8_t byte_count)
+    void ModbusTCP::sock_send(uint8_t byte_count)
     {
+        uint8_t bytes_sent = 0;
+
         if (!is_connected)
         {
             connect();
@@ -396,15 +337,24 @@ namespace modbus
 
         try
         {
-            return sock_.write_some(boost::asio::buffer(send_, byte_count));  
+            bytes_sent = sock_.write_some(boost::asio::buffer(send_, byte_count));  
         }
         catch(const std::exception& e)
         {
             std::cerr << e.what() << '\n';
             is_connected = false;
-            return 0;
         }
-        
+
+        if (bytes_sent != byte_count)
+        {
+            /**
+             * @todo add loging using boost::log
+             * 
+             */
+            std::stringstream err_msg;
+            err_msg << "Was sent: " << bytes_sent << " bytes. Should be: 12";
+            throw std::exception(err_msg.str().c_str());
+        }
     }
 
     /**
@@ -412,8 +362,10 @@ namespace modbus
      * 
      * @return uint8_t      number of bytes read
      */
-    uint8_t ModbusTCP::sock_read()
+    void ModbusTCP::sock_read()
     {
+        // number '9' is correspond situetion when device sending an error message
+        uint8_t bytes_recieved = 9;
         if (!is_connected)
         {
             connect();
@@ -421,13 +373,23 @@ namespace modbus
 
         try
         {
-            return sock_.read_some(boost::asio::buffer(rcv_));
+            bytes_recieved = sock_.read_some(boost::asio::buffer(rcv_));
         }
         catch(const std::exception& e)
         {
             std::cerr << e.what() << '\n';
             is_connected = false;
-            return 9;
+        }
+
+        if (bytes_recieved == 9)
+        {
+            /**
+             * @todo add loging using boost::log
+             * 
+             */
+            std::stringstream err_msg;
+            err_msg << "ModBus read error: " << std::hex << rcv_[8];
+            throw std::exception(err_msg.str().c_str());
         }
     }
 }
