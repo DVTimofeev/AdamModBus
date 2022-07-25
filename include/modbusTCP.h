@@ -90,9 +90,9 @@ namespace modbus
         std::optional<uint16_t> read_AO(uint8_t address);
         std::optional<uint16_t> read_AI(uint8_t address);
         bool write_DO(uint8_t address, bool value);
-        bool write_AO(uint8_t address, uint8_t value);
-        size_t write_DOs(uint8_t address, uint8_t count, uint8_t value);
-        size_t write_AOs(uint8_t address, uint8_t count, uint8_t value);
+        bool write_AO(uint8_t address, uint16_t value);
+        bool write_DOs(uint8_t address, uint8_t count, uint8_t value);
+        bool write_AOs(uint8_t address, uint8_t count, uint8_t value);
     private:
         void init_bytes_to_send();
         void sock_send(uint8_t bytes);
@@ -312,6 +312,12 @@ namespace modbus
         return result;
     }
 
+    /**
+     * @brief read analog input at address
+     * 
+     * @param address       coil address  
+     * @return uint16_t     Dec value
+     */
     std::optional<uint16_t> ModbusTCP::read_AI(uint8_t address)
     {
         std::optional<uint16_t> result;
@@ -338,6 +344,13 @@ namespace modbus
         return result;
     }
 
+    /**
+     * @brief write digital output at address
+     * 
+     * @param address   coil address
+     * @param turn_on   condition to write
+     * @return bool     was written or not
+     */
     bool ModbusTCP::write_DO(uint8_t address, bool turn_on)
     {
         try
@@ -365,6 +378,64 @@ namespace modbus
         return true;
     }
 
+    /**
+     * @brief write analog output at address
+     * 
+     * @param address   coil address
+     * @param value   value to write
+     * @return bool     was written or not
+     */
+    bool ModbusTCP::write_AO(uint8_t address, uint16_t value)
+    {
+        try
+        {
+            init_bytes_to_send();
+            send_[7] = 6;
+            send_[9] = address;
+            send_[10] = (value >> 8);
+            send_[11] = value;
+
+            sock_send(12);
+            sock_read();
+        }
+        catch(const std::exception& e)
+        {
+            std::cerr << e.what() << '\n';
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * @brief write digital outputs at address
+     * 
+     * @param address   coil start address
+     * @param count     number of coils to switch
+     * @param value     new state of coils (each byte reflects the new state of the coil)
+     * @return bool     was written or not
+     */
+    bool ModbusTCP::write_DOs(uint8_t address, uint8_t count, uint8_t value)
+    {
+        try
+        {
+            init_bytes_to_send();
+            send_[7] = '\x0f';
+            send_[9] = address;
+            send_[11] = count;
+            send_[12] = 1;
+            send_[13] = value;
+
+            sock_send(14);
+            sock_read();
+        }
+        catch(const std::exception& e)
+        {
+            std::cerr << e.what() << '\n';
+            return false;
+        }
+        return true;
+    }
+    // bool write_AOs(uint8_t address, uint8_t count, uint8_t value);
 
     /**
      * @brief initiates default values of bytes for sending
