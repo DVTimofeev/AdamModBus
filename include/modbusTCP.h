@@ -88,15 +88,16 @@ namespace modbus
         std::optional<uint8_t> read_DO(uint8_t address,  uint8_t reg_count = 1);
         std::optional<uint8_t> read_DI(uint8_t address,  uint8_t reg_count = 1);
         std::optional<uint16_t> read_AO(uint8_t address);
-        size_t read_AI();
-        size_t write_DO(uint8_t adress, uint8_t value);
-        size_t write_AO(uint8_t adress, uint8_t value);
-        size_t write_DOs(uint8_t adress, uint8_t count, uint8_t value);
-        size_t write_AOs(uint8_t adress, uint8_t count, uint8_t value);
+        std::optional<uint16_t> read_AI(uint8_t address);
+        bool write_DO(uint8_t address, bool value);
+        bool write_AO(uint8_t address, uint8_t value);
+        size_t write_DOs(uint8_t address, uint8_t count, uint8_t value);
+        size_t write_AOs(uint8_t address, uint8_t count, uint8_t value);
     private:
         void init_bytes_to_send();
         void sock_send(uint8_t bytes);
         void sock_read();
+        std::string get_error_msg(uint8_t err);
 
     private:
         // boost::asio::ip::tcp
@@ -311,6 +312,60 @@ namespace modbus
         return result;
     }
 
+    std::optional<uint16_t> ModbusTCP::read_AI(uint8_t address)
+    {
+        std::optional<uint16_t> result;
+        try
+        {
+            init_bytes_to_send();
+            send_[7] = 4;
+            send_[9] = address;
+            send_[11] = 1;
+            
+            sock_send(12);
+            sock_read();
+            
+            // the result consists of two bytes 10th and 11th
+            result = rcv_[9];
+
+            // merging 2 bytes in uint16_t value and returning it as result
+            result = (result.value() << 8) | rcv_[10];
+        }
+        catch(const std::exception& e)
+        {
+            std::cerr << e.what() << '\n';
+        }    
+        return result;
+    }
+
+    bool ModbusTCP::write_DO(uint8_t address, bool turn_on)
+    {
+        try
+        {
+            init_bytes_to_send();
+            send_[7] = 5;
+            send_[9] = address;
+            if (turn_on)
+            {
+                send_[10] = '\xff';
+            }
+            else
+            {
+                send_[10] = 0;
+            }
+
+            sock_send(12);
+            sock_read();
+        }
+        catch(const std::exception& e)
+        {
+            std::cerr << e.what() << '\n';
+            return false;
+        }
+        return true;
+    }
+
+
     /**
      * @brief initiates default values of bytes for sending
      * 
@@ -352,7 +407,7 @@ namespace modbus
              * 
              */
             std::stringstream err_msg;
-            err_msg << "Was sent: " << bytes_sent << " bytes. Should be: 12";
+            err_msg << "Was sent: " << bytes_sent << " bytes. Should be: " << byte_count;
             throw std::exception(err_msg.str().c_str());
         }
     }
@@ -387,9 +442,58 @@ namespace modbus
              * @todo add loging using boost::log
              * 
              */
-            std::stringstream err_msg;
-            err_msg << "ModBus read error: " << std::hex << rcv_[8];
-            throw std::exception(err_msg.str().c_str());
+            std::string err_msg = get_error_msg(rcv_[8]);
+            throw std::exception(err_msg.c_str());
         }
     }
+
+    std::string ModbusTCP::get_error_msg(uint8_t err)
+    {
+        std::stringstream err_msg;
+        err_msg << "ModBus read error: ";
+        switch (err)
+        {
+            case '\x01':
+            err_msg << "Received function code could not be processed";
+            break;
+            case '\x02':
+            err_msg << "The data address specified in the request is not available";
+            break;
+            case '\x03':
+            err_msg << "The value contained in the request data field is an invalid value";
+            break;
+            case '\x04':
+            err_msg << "An unrecoverable error occurred while the slave attempted to perform the requested action";
+            break;
+            case '\x05':
+            err_msg << "The slave has received the request and is processing it, but it takes a long time. \
+                        This response prevents the master from generating a timeout error";
+            break;
+            case '\x06':
+            err_msg << "The slave device is busy processing the command. \
+                        The master must repeat the message later when the slave is free.";
+            break;
+            case '\x07':
+            err_msg << "The slave device cannot execute the program function specified in the request. \
+                        This code is returned for an unsuccessful program request using function numbers 13 or 14. \
+                        The master must request diagnostic or error information from the slave.";
+            break;
+            case '\x08':
+            err_msg << "The slave device encountered a parity error while reading extended memory. \
+                        The master may repeat the request, but usually in such cases repair is required";
+            break;
+            case '\x0a':
+            err_msg << "Gateway misconfigured or overloaded with requests";
+            break;
+            case '\x0b':
+            err_msg << "Slave device is not online or there is no response from it";
+            break;
+            
+            default:
+            err_msg << "Unknown Error";
+        }
+        return err_msg.str();
+    }
+
 }
+
