@@ -92,7 +92,7 @@ namespace modbus
         bool write_DO(uint8_t address, bool value);
         bool write_AO(uint8_t address, uint16_t value);
         bool write_DOs(uint8_t address, uint8_t count, uint8_t value);
-        bool write_AOs(uint8_t address, uint8_t count, uint8_t value);
+        bool write_AOs(uint8_t address, uint8_t count, uint16_t value1, uint16_t value2 = 0);
     private:
         void init_bytes_to_send();
         void sock_send(uint8_t bytes);
@@ -435,7 +435,40 @@ namespace modbus
         }
         return true;
     }
-    // bool write_AOs(uint8_t address, uint8_t count, uint8_t value);
+    
+    /**
+     * @brief write analog outputs at address
+     * 
+     * @param address   coil start address
+     * @param count     1 or 2 coils to set value
+     * @param value1    value to write to first coil
+     * @param value2    value to write to second coil
+     * @return bool     was written or not
+     */
+    bool ModbusTCP::write_AOs(uint8_t address, uint8_t count, uint16_t value1, uint16_t value2)
+    {
+        try
+        {
+            init_bytes_to_send();
+            send_[7] = '\x10';
+            send_[9] = address;
+            send_[11] = count;
+            send_[12] = 4;
+            send_[13] = (value1 >> 8);
+            send_[14] = value1;
+            send_[15] = (value2 >> 8);
+            send_[16] = value2;
+
+            sock_send(17);
+            sock_read();
+        }
+        catch(const std::exception& e)
+        {
+            std::cerr << e.what() << '\n';
+            return false;
+        }
+        return true;
+    }
 
     /**
      * @brief initiates default values of bytes for sending
