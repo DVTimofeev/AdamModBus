@@ -558,39 +558,39 @@ namespace modbus
         switch (err)
         {
             case '\x01':
-            err_msg << "Received function code could not be processed";
+            err_msg << "\x01 - Received function code could not be processed";
             break;
             case '\x02':
-            err_msg << "The data address specified in the request is not available";
+            err_msg << "\x02 - The data address specified in the request is not available";
             break;
             case '\x03':
-            err_msg << "The value contained in the request data field is an invalid value";
+            err_msg << "\x03 - The value contained in the request data field is an invalid value";
             break;
             case '\x04':
-            err_msg << "An unrecoverable error occurred while the slave attempted to perform the requested action";
+            err_msg << "\x04 - An unrecoverable error occurred while the slave attempted to perform the requested action";
             break;
             case '\x05':
-            err_msg << "The slave has received the request and is processing it, but it takes a long time. \
+            err_msg << "\x05 - The slave has received the request and is processing it, but it takes a long time. \
                         This response prevents the master from generating a timeout error";
             break;
             case '\x06':
-            err_msg << "The slave device is busy processing the command. \
+            err_msg << "\x06 - The slave device is busy processing the command. \
                         The master must repeat the message later when the slave is free.";
             break;
             case '\x07':
-            err_msg << "The slave device cannot execute the program function specified in the request. \
+            err_msg << "\x07 - The slave device cannot execute the program function specified in the request. \
                         This code is returned for an unsuccessful program request using function numbers 13 or 14. \
                         The master must request diagnostic or error information from the slave.";
             break;
             case '\x08':
-            err_msg << "The slave device encountered a parity error while reading extended memory. \
+            err_msg << "\x08 - The slave device encountered a parity error while reading extended memory. \
                         The master may repeat the request, but usually in such cases repair is required";
             break;
             case '\x0a':
-            err_msg << "Gateway misconfigured or overloaded with requests";
+            err_msg << "\x0a - Gateway misconfigured or overloaded with requests";
             break;
             case '\x0b':
-            err_msg << "Slave device is not online or there is no response from it";
+            err_msg << "\x0b - Slave device is not online or there is no response from it";
             break;
             
             default:
