@@ -28,21 +28,12 @@ struct Valve_2_2{
 
 using boost::asio::ip::tcp;
 
+
 int main()
 {
-    boost::asio::io_service service;
-    modbus::ModbusTCP* adam5000 = new modbus::ModbusTCP(service, "192.168.1.10", 502, "adam5000");
-    adam5000->connect();
-    // adam5000->write_DO(49, false);
-    Valve_2_2 valve_49(adam5000, 49);
-    valve_49.open();
-    std::cout << std::boolalpha << "Open : " << valve_49.is_opened() << std::endl;
-    valve_49.open();
-    std::cout << std::boolalpha << "Open : " << valve_49.is_opened() << std::endl;
-    valve_49.close();
-    std::cout << std::boolalpha << "Close : " << valve_49.is_opened() << std::endl;
-    
-    
-
+    // boost::asio::io_service service;
+    // modbus::ModbusTCP* adam5000 = new modbus::ModbusTCP(service, "192.168.1.10", 502, "adam5000");
+    // adam5000->connect();
+    // adam5000->write_AOs(56, 2, 0, 0);
     return 0;
 }
