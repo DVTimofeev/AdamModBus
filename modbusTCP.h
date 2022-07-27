@@ -106,7 +106,7 @@ namespace modbus
         tcp::socket sock_;
 
         //connection
-        bool is_connected = false;
+        bool is_connected_ = false;
 
         std::array<uint8_t,17> send_;
         std::array<uint8_t,13> rcv_;
@@ -136,14 +136,14 @@ namespace modbus
              * @todo add loging using boost::log
              * 
              */
-            is_connected = false;
+            is_connected_ = false;
         }
         else
         {
             try
             {
                 sock_.connect(ep_);
-                is_connected = true;
+                is_connected_ = true;
             }
             catch (...)
             {
@@ -154,7 +154,7 @@ namespace modbus
             }
         }
         
-        return is_connected;
+        return is_connected_;
     }
 
     /**
@@ -177,7 +177,7 @@ namespace modbus
         ip_address_ = std::move(ip);
 
         // after changing ip address reconnection is required
-        is_connected = false;
+        is_connected_ = false;
     }
 
     /**
@@ -190,7 +190,7 @@ namespace modbus
         port_ = port;
 
         // after changing port number reconnection is required
-        is_connected = false;
+        is_connected_ = false;
     }
 
     /**
@@ -233,6 +233,9 @@ namespace modbus
     std::optional<uint8_t> ModbusTCP::read_DO(uint8_t address, uint8_t reg_count)
     {
         std::optional<uint8_t> result;
+        
+        // do it only if there is a connection
+        if (is_connected_)
         try
         {
             init_bytes_to_send();
@@ -262,6 +265,9 @@ namespace modbus
     std::optional<uint8_t> ModbusTCP::read_DI(uint8_t address, uint8_t reg_count)
     {
         std::optional<uint8_t> result;
+        
+        // do it only if there is a connection
+        if (is_connected_)
         try
         {
             init_bytes_to_send();
@@ -290,6 +296,9 @@ namespace modbus
     std::optional<uint16_t> ModbusTCP::read_AO(uint8_t address) 
     {
         std::optional<uint16_t> result;
+
+        // do it only if there is a connection
+        if (is_connected_)
         try
         {
             init_bytes_to_send();
@@ -322,6 +331,9 @@ namespace modbus
     std::optional<uint16_t> ModbusTCP::read_AI(uint8_t address)
     {
         std::optional<uint16_t> result;
+
+        // do it only if there is a connection
+        if (is_connected_)
         try
         {
             init_bytes_to_send();
@@ -354,6 +366,8 @@ namespace modbus
      */
     bool ModbusTCP::write_DO(uint8_t address, bool turn_on)
     {
+        if (!is_connected_) return false;
+        
         try
         {
             init_bytes_to_send();
@@ -388,6 +402,8 @@ namespace modbus
      */
     bool ModbusTCP::write_AO(uint8_t address, uint16_t value)
     {
+        if (!is_connected_) return false;
+        
         try
         {
             init_bytes_to_send();
@@ -417,6 +433,8 @@ namespace modbus
      */
     bool ModbusTCP::write_DOs(uint8_t address, uint8_t count, uint8_t value)
     {
+        if (!is_connected_) return false;
+        
         try
         {
             init_bytes_to_send();
@@ -448,6 +466,8 @@ namespace modbus
      */
     bool ModbusTCP::write_AOs(uint8_t address, uint8_t count, uint16_t value1, uint16_t value2)
     {
+        if (!is_connected_) return false;
+
         try
         {
             init_bytes_to_send();
@@ -490,7 +510,7 @@ namespace modbus
     {
         uint8_t bytes_sent = 0;
 
-        if (!is_connected)
+        if (!is_connected_)
         {
             connect();
         }
@@ -502,7 +522,7 @@ namespace modbus
         catch(const std::exception& e)
         {
             std::cerr << e.what() << '\n';
-            is_connected = false;
+            is_connected_ = false;
         }
 
         if (bytes_sent != byte_count)
@@ -526,7 +546,7 @@ namespace modbus
     {
         // number '9' is correspond situetion when device sending an error message
         uint8_t bytes_recieved = 9;
-        if (!is_connected)
+        if (!is_connected_)
         {
             connect();
         }
@@ -538,7 +558,7 @@ namespace modbus
         catch(const std::exception& e)
         {
             std::cerr << e.what() << '\n';
-            is_connected = false;
+            is_connected_ = false;
         }
 
         if (bytes_recieved == 9)
