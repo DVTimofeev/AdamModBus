@@ -1,4 +1,5 @@
 #pragma once
+#include <iostream>
 // 3d party lib
 #include <boost/asio.hpp>
 
@@ -512,7 +513,7 @@ namespace modbus
              */
             std::stringstream err_msg;
             err_msg << "Was sent: " << bytes_sent << " bytes. Should be: " << byte_count;
-            throw std::exception(err_msg.str().c_str());
+            throw std::runtime_error(err_msg.str());
         }
     }
 
@@ -547,7 +548,7 @@ namespace modbus
              * 
              */
             std::string err_msg = get_error_msg(rcv_[8]);
-            throw std::exception(err_msg.c_str());
+            throw std::runtime_error(err_msg);
         }
     }
 
